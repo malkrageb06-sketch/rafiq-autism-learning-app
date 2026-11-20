@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix رفيق | Rafiq Autism Learning App",
+  "description": "تطبيق تعليمي تفاعلي هادئ ومصمم خصيصاً للأطفال من ذوي اضطراب طيف التوحد لتعلم الألوان والأشكال والأرقام والمشاعر باللغة العربية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
