@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from './components/AppShell';
-import { ModuleKey, ProgressState, ScreenId, UserAccount } from './types/rafiq';
+import { ModuleKey, ModuleTierProgress, ProgressState, QuizTier, ScreenId, UserAccount } from './types/rafiq';
 import { SplashScreen } from './screens/SplashScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -12,9 +12,35 @@ import { EmotionsLearningScreen } from './screens/EmotionsLearningScreen';
 import { QuizScreen } from './screens/QuizScreen';
 import { RewardsScreen } from './screens/RewardsScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { AskRafiqScreen } from './screens/AskRafiqScreen';
+import { DailyRoutineScreen } from './screens/DailyRoutineScreen';
+import { ParentDashboardScreen } from './screens/ParentDashboardScreen';
+import { AchievementsScreen } from './screens/AchievementsScreen';
 import { playGentleTap } from './utils/audio';
+import { useConnectivityAndSync } from './hooks/useOnlineStatus';
+import {
+  clearAuthSessionLocally,
+  getOrCreateSyncId,
+  loadAuthSessionLocally,
+  LOCAL_STORAGE_KEY,
+  loadUserStateFromIndexedDB,
+  mergeProgressStates,
+  saveAuthSessionLocally,
+  saveUserStateToIndexedDB,
+} from './utils/offlineStorage';
 
-const STORAGE_KEY = 'rafiq_asd_learning_v1';
+const STORAGE_KEY = LOCAL_STORAGE_KEY;
+
+const DEFAULT_MODULE_TIER: ModuleTierProgress = {
+  beginnerCompleted: false,
+  intermediateCompleted: false,
+  advancedCompleted: false,
+  bestScores: {
+    beginner: 0,
+    intermediate: 0,
+    advanced: 0,
+  },
+};
 
 const DEFAULT_PROGRESS: ProgressState = {
   stars: 0,
@@ -38,7 +64,16 @@ const DEFAULT_PROGRESS: ProgressState = {
     numbers: 0,
     emotions: 0,
   },
+  moduleTiers: {
+    colors: { ...DEFAULT_MODULE_TIER, bestScores: { ...DEFAULT_MODULE_TIER.bestScores } },
+    shapes: { ...DEFAULT_MODULE_TIER, bestScores: { ...DEFAULT_MODULE_TIER.bestScores } },
+    numbers: { ...DEFAULT_MODULE_TIER, bestScores: { ...DEFAULT_MODULE_TIER.bestScores } },
+    emotions: { ...DEFAULT_MODULE_TIER, bestScores: { ...DEFAULT_MODULE_TIER.bestScores } },
+  },
   totalCorrectAnswers: 0,
+  routineTasks: {},
+  aiQuestionsAsked: 0,
+  dailyRewardClaimedDate: null,
 };
 
 const DEFAULT_USER: UserAccount = {
@@ -51,17 +86,40 @@ const DEFAULT_USER: UserAccount = {
 interface PersistedData {
   user: UserAccount;
   progress: ProgressState;
+  isAuthenticated: boolean;
+  loggedInAt: string | null;
 }
 
 function loadPersistedData(): PersistedData {
+  const storedSession = loadAuthSessionLocally();
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { user: DEFAULT_USER, progress: DEFAULT_PROGRESS };
+      return {
+        user: storedSession?.user ? { ...DEFAULT_USER, ...storedSession.user } : DEFAULT_USER,
+        progress: DEFAULT_PROGRESS,
+        isAuthenticated: Boolean(storedSession?.isAuthenticated),
+        loggedInAt: storedSession?.loggedInAt ?? null,
+      };
     }
     const parsed = JSON.parse(raw) as Partial<PersistedData>;
+    const resolvedAuthenticated = Boolean(
+      storedSession?.isAuthenticated ?? parsed.isAuthenticated
+    );
+    const resolvedLoggedInAt =
+      storedSession?.loggedInAt ??
+      (typeof parsed.loggedInAt === 'string' ? parsed.loggedInAt : null);
+    const resolvedUser = {
+      ...DEFAULT_USER,
+      ...(parsed.user ?? {}),
+      ...(storedSession?.user ?? {}),
+    };
+
     return {
-      user: { ...DEFAULT_USER, ...(parsed.user ?? {}) },
+      user: resolvedUser,
+      isAuthenticated: resolvedAuthenticated,
+      loggedInAt: resolvedLoggedInAt,
       progress: {
         ...DEFAULT_PROGRESS,
         ...(parsed.progress ?? {}),
@@ -77,26 +135,159 @@ function loadPersistedData(): PersistedData {
           ...DEFAULT_PROGRESS.quizScores,
           ...(parsed.progress?.quizScores ?? {}),
         },
+        moduleTiers: {
+          colors: {
+            ...DEFAULT_MODULE_TIER,
+            ...(parsed.progress?.moduleTiers?.colors ?? {}),
+            beginnerCompleted:
+              parsed.progress?.moduleTiers?.colors?.beginnerCompleted ??
+              Boolean(parsed.progress?.completedQuizzes?.colors),
+            bestScores: {
+              ...DEFAULT_MODULE_TIER.bestScores,
+              ...(parsed.progress?.moduleTiers?.colors?.bestScores ?? {}),
+            },
+          },
+          shapes: {
+            ...DEFAULT_MODULE_TIER,
+            ...(parsed.progress?.moduleTiers?.shapes ?? {}),
+            beginnerCompleted:
+              parsed.progress?.moduleTiers?.shapes?.beginnerCompleted ??
+              Boolean(parsed.progress?.completedQuizzes?.shapes),
+            bestScores: {
+              ...DEFAULT_MODULE_TIER.bestScores,
+              ...(parsed.progress?.moduleTiers?.shapes?.bestScores ?? {}),
+            },
+          },
+          numbers: {
+            ...DEFAULT_MODULE_TIER,
+            ...(parsed.progress?.moduleTiers?.numbers ?? {}),
+            beginnerCompleted:
+              parsed.progress?.moduleTiers?.numbers?.beginnerCompleted ??
+              Boolean(parsed.progress?.completedQuizzes?.numbers),
+            bestScores: {
+              ...DEFAULT_MODULE_TIER.bestScores,
+              ...(parsed.progress?.moduleTiers?.numbers?.bestScores ?? {}),
+            },
+          },
+          emotions: {
+            ...DEFAULT_MODULE_TIER,
+            ...(parsed.progress?.moduleTiers?.emotions ?? {}),
+            beginnerCompleted:
+              parsed.progress?.moduleTiers?.emotions?.beginnerCompleted ??
+              Boolean(parsed.progress?.completedQuizzes?.emotions),
+            bestScores: {
+              ...DEFAULT_MODULE_TIER.bestScores,
+              ...(parsed.progress?.moduleTiers?.emotions?.bestScores ?? {}),
+            },
+          },
+        },
+        routineTasks: {
+          ...DEFAULT_PROGRESS.routineTasks,
+          ...(parsed.progress?.routineTasks ?? {}),
+        },
       },
     };
   } catch {
-    return { user: DEFAULT_USER, progress: DEFAULT_PROGRESS };
+    return {
+      user: storedSession?.user ? { ...DEFAULT_USER, ...storedSession.user } : DEFAULT_USER,
+      progress: DEFAULT_PROGRESS,
+      isAuthenticated: Boolean(storedSession?.isAuthenticated),
+      loggedInAt: storedSession?.loggedInAt ?? null,
+    };
   }
 }
 
 export default function App() {
   const [initialData] = useState<PersistedData>(() => loadPersistedData());
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('splash');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialData.isAuthenticated);
+  const [loggedInAt, setLoggedInAt] = useState<string | null>(initialData.loggedInAt);
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(() =>
+    initialData.isAuthenticated ? 'home' : 'splash'
+  );
   const [user, setUser] = useState<UserAccount>(initialData.user);
   const [progress, setProgress] = useState<ProgressState>(initialData.progress);
 
+  const {
+    isOnline,
+    syncStatus,
+    lastSyncedAt,
+    contentManifest,
+    contentUpdatedNotice,
+    syncNow,
+  } = useConnectivityAndSync({ user, progress });
+
+  // Restore any newer IndexedDB session/progress or cloud-synced progress safely on startup
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const idbState = await loadUserStateFromIndexedDB();
+      if (active && idbState) {
+        if (idbState.progress) {
+          setProgress((prev) => mergeProgressStates(prev, idbState.progress));
+        }
+        // If localStorage lacked session info (e.g. evicted) but IndexedDB holds an active login session,
+        // automatically restore the user session and open the Home Screen directly.
+        if (!initialData.isAuthenticated && idbState.isAuthenticated && idbState.user?.name) {
+          setUser({ ...DEFAULT_USER, ...idbState.user });
+          setIsAuthenticated(true);
+          setLoggedInAt(idbState.loggedInAt ?? null);
+          saveAuthSessionLocally(true, idbState.loggedInAt ?? null, idbState.user);
+          setCurrentScreen((curr) => (curr === 'splash' || curr === 'login' ? 'home' : curr));
+        }
+      }
+
+      if (!navigator.onLine) return;
+      try {
+        const activeUser = idbState?.user?.name ? idbState.user : initialData.user;
+        const syncId = getOrCreateSyncId(activeUser);
+        const res = await fetch(`/api/sync-progress?syncId=${encodeURIComponent(syncId)}`, {
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!res.ok) return;
+        const cloud = (await res.json()) as {
+          found?: boolean;
+          progress?: Partial<ProgressState>;
+        };
+        if (active && cloud.found && cloud.progress) {
+          setProgress((prev) => mergeProgressStates(prev, cloud.progress!));
+        }
+      } catch {
+        // Offline or unreachable; local progress stays intact
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [initialData.isAuthenticated, initialData.user]);
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ user, progress }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          user,
+          progress,
+          isAuthenticated,
+          loggedInAt,
+        })
+      );
+      saveAuthSessionLocally(isAuthenticated, loggedInAt, user);
     } catch {
       // Ignore storage quota errors
     }
-  }, [user, progress]);
+
+    void saveUserStateToIndexedDB({
+      id: 'current',
+      user,
+      progress,
+      isAuthenticated,
+      loggedInAt,
+      updatedAt: Date.now(),
+      lastSyncedAt,
+    });
+  }, [user, progress, isAuthenticated, loggedInAt, lastSyncedAt]);
 
   const navigateTo = (screen: ScreenId) => {
     playGentleTap(progress.soundEnabled);
@@ -126,7 +317,33 @@ export default function App() {
 
   const handleAuthenticate = (account: UserAccount) => {
     playGentleTap(progress.soundEnabled);
+    const loginTimestamp = new Date().toISOString();
     setUser(account);
+    setIsAuthenticated(true);
+    setLoggedInAt(loginTimestamp);
+    saveAuthSessionLocally(true, loginTimestamp, account);
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          user: account,
+          progress,
+          isAuthenticated: true,
+          loggedInAt: loginTimestamp,
+        })
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+    void saveUserStateToIndexedDB({
+      id: 'current',
+      user: account,
+      progress,
+      isAuthenticated: true,
+      loggedInAt: loginTimestamp,
+      updatedAt: Date.now(),
+      lastSyncedAt,
+    });
     setCurrentScreen('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -139,22 +356,91 @@ export default function App() {
     }));
   };
 
-  const handleCompleteQuiz = (moduleKey: ModuleKey, score: number) => {
+  const handleAwardAskStars = (amount: number) => {
     setProgress((prev) => ({
       ...prev,
-      completedLessons: {
-        ...prev.completedLessons,
-        [moduleKey]: true,
-      },
-      completedQuizzes: {
-        ...prev.completedQuizzes,
-        [moduleKey]: true,
-      },
-      quizScores: {
-        ...prev.quizScores,
-        [moduleKey]: Math.max(prev.quizScores[moduleKey], score),
-      },
+      stars: prev.stars + amount,
+      aiQuestionsAsked: prev.aiQuestionsAsked + 1,
     }));
+  };
+
+  const handleToggleRoutineTask = (taskId: string, completed: boolean, starsReward: number) => {
+    setProgress((prev) => {
+      const wasCompleted = Boolean(prev.routineTasks[taskId]);
+      if (wasCompleted === completed) return prev;
+      const starDelta = completed ? starsReward : -starsReward;
+      return {
+        ...prev,
+        stars: Math.max(0, prev.stars + starDelta),
+        routineTasks: {
+          ...prev.routineTasks,
+          [taskId]: completed,
+        },
+      };
+    });
+  };
+
+  const handleResetRoutine = () => {
+    setProgress((prev) => ({
+      ...prev,
+      routineTasks: {},
+    }));
+  };
+
+  const handleClaimDailyReward = (amount: number, dateKey: string) => {
+    setProgress((prev) => {
+      if (prev.dailyRewardClaimedDate === dateKey) return prev;
+      return {
+        ...prev,
+        stars: prev.stars + amount,
+        dailyRewardClaimedDate: dateKey,
+      };
+    });
+  };
+
+  const handleCompleteTier = (
+    moduleKey: ModuleKey,
+    tier: QuizTier,
+    score: number,
+    bonusStars: number
+  ) => {
+    setProgress((prev) => {
+      const currentTierData = prev.moduleTiers[moduleKey] ?? DEFAULT_MODULE_TIER;
+      const updatedTierData: ModuleTierProgress = {
+        ...currentTierData,
+        beginnerCompleted:
+          currentTierData.beginnerCompleted || tier === 'beginner',
+        intermediateCompleted:
+          currentTierData.intermediateCompleted || tier === 'intermediate',
+        advancedCompleted:
+          currentTierData.advancedCompleted || tier === 'advanced',
+        bestScores: {
+          ...currentTierData.bestScores,
+          [tier]: Math.max(currentTierData.bestScores[tier] ?? 0, score),
+        },
+      };
+
+      return {
+        ...prev,
+        stars: prev.stars + bonusStars,
+        completedLessons: {
+          ...prev.completedLessons,
+          [moduleKey]: true,
+        },
+        completedQuizzes: {
+          ...prev.completedQuizzes,
+          [moduleKey]: true,
+        },
+        quizScores: {
+          ...prev.quizScores,
+          [moduleKey]: Math.max(prev.quizScores[moduleKey], score),
+        },
+        moduleTiers: {
+          ...prev.moduleTiers,
+          [moduleKey]: updatedTierData,
+        },
+      };
+    });
   };
 
   const handleToggleSound = () => {
@@ -173,7 +459,33 @@ export default function App() {
 
   const handleLogout = () => {
     playGentleTap(progress.soundEnabled);
+    setIsAuthenticated(false);
+    setLoggedInAt(null);
+    clearAuthSessionLocally();
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          user,
+          progress,
+          isAuthenticated: false,
+          loggedInAt: null,
+        })
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+    void saveUserStateToIndexedDB({
+      id: 'current',
+      user,
+      progress,
+      isAuthenticated: false,
+      loggedInAt: null,
+      updatedAt: Date.now(),
+      lastSyncedAt,
+    });
     setCurrentScreen('login');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getHeaderMeta = (): { title?: string; backTarget?: ScreenId } => {
@@ -194,6 +506,14 @@ export default function App() {
         return { title: 'تعلم المشاعر', backTarget: 'home' };
       case 'emotions-quiz':
         return { title: 'اختبار المشاعر', backTarget: 'emotions-learn' };
+      case 'ask-rafiq':
+        return { title: 'اسأل رفيق', backTarget: 'home' };
+      case 'daily-routine':
+        return { title: 'جدولي اليومي', backTarget: 'home' };
+      case 'parent-dashboard':
+        return { title: 'متابعة الطفل', backTarget: 'home' };
+      case 'achievements':
+        return { title: 'المستويات والإنجازات', backTarget: 'home' };
       case 'lessons':
         return { title: 'الدروس' };
       case 'rewards':
@@ -216,6 +536,9 @@ export default function App() {
       onToggleSound={handleToggleSound}
       pageTitle={title}
       backTarget={backTarget}
+      isOnline={isOnline}
+      syncStatus={syncStatus}
+      contentUpdatedNotice={contentUpdatedNotice}
     >
       {currentScreen === 'splash' && <SplashScreen onStart={() => navigateTo('login')} />}
 
@@ -245,9 +568,9 @@ export default function App() {
         <QuizScreen
           key="colors-quiz"
           moduleKey="colors"
-          soundEnabled={progress.soundEnabled}
+          progress={progress}
           onAwardStars={handleAwardStars}
-          onCompleteQuiz={handleCompleteQuiz}
+          onCompleteTier={handleCompleteTier}
           onNavigate={navigateTo}
         />
       )}
@@ -263,9 +586,9 @@ export default function App() {
         <QuizScreen
           key="shapes-quiz"
           moduleKey="shapes"
-          soundEnabled={progress.soundEnabled}
+          progress={progress}
           onAwardStars={handleAwardStars}
-          onCompleteQuiz={handleCompleteQuiz}
+          onCompleteTier={handleCompleteTier}
           onNavigate={navigateTo}
         />
       )}
@@ -281,9 +604,9 @@ export default function App() {
         <QuizScreen
           key="numbers-quiz"
           moduleKey="numbers"
-          soundEnabled={progress.soundEnabled}
+          progress={progress}
           onAwardStars={handleAwardStars}
-          onCompleteQuiz={handleCompleteQuiz}
+          onCompleteTier={handleCompleteTier}
           onNavigate={navigateTo}
         />
       )}
@@ -299,9 +622,40 @@ export default function App() {
         <QuizScreen
           key="emotions-quiz"
           moduleKey="emotions"
-          soundEnabled={progress.soundEnabled}
+          progress={progress}
           onAwardStars={handleAwardStars}
-          onCompleteQuiz={handleCompleteQuiz}
+          onCompleteTier={handleCompleteTier}
+          onNavigate={navigateTo}
+        />
+      )}
+
+      {currentScreen === 'ask-rafiq' && (
+        <AskRafiqScreen
+          soundEnabled={progress.soundEnabled}
+          aiQuestionsAsked={progress.aiQuestionsAsked}
+          onAwardAskStars={handleAwardAskStars}
+          onNavigate={navigateTo}
+          isOnline={isOnline}
+        />
+      )}
+
+      {currentScreen === 'daily-routine' && (
+        <DailyRoutineScreen
+          routineTasks={progress.routineTasks}
+          soundEnabled={progress.soundEnabled}
+          onToggleTask={handleToggleRoutineTask}
+          onResetRoutine={handleResetRoutine}
+        />
+      )}
+
+      {currentScreen === 'parent-dashboard' && (
+        <ParentDashboardScreen user={user} progress={progress} onNavigate={navigateTo} />
+      )}
+
+      {currentScreen === 'achievements' && (
+        <AchievementsScreen
+          progress={progress}
+          onClaimDailyReward={handleClaimDailyReward}
           onNavigate={navigateTo}
         />
       )}
@@ -318,6 +672,11 @@ export default function App() {
           onToggleSound={handleToggleSound}
           onResetProgress={handleResetProgress}
           onLogout={handleLogout}
+          isOnline={isOnline}
+          syncStatus={syncStatus}
+          lastSyncedAt={lastSyncedAt}
+          contentManifest={contentManifest}
+          onManualSync={() => void syncNow()}
         />
       )}
     </AppShell>

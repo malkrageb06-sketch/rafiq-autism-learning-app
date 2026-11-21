@@ -1,8 +1,23 @@
 import React from 'react';
-import { ArrowRight, Award, BookOpen, Home, Star, User, Volume2, VolumeX } from 'lucide-react';
+import {
+  ArrowRight,
+  Award,
+  BookOpen,
+  Bot,
+  CalendarCheck2,
+  Home,
+  Star,
+  Trophy,
+  User,
+  Users,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { ScreenId } from '../types/rafiq';
 import { toArabicDigits } from '../data/learningData';
 import { RafiqLogo } from './Illustrations';
+import { OfflineIndicator, PWAInstallButton } from './PWAStatusComponents';
+import { SyncStatus } from '../hooks/useOnlineStatus';
 
 interface AppShellProps {
   currentScreen: ScreenId;
@@ -12,14 +27,39 @@ interface AppShellProps {
   onToggleSound: () => void;
   pageTitle?: string;
   backTarget?: ScreenId;
+  isOnline?: boolean;
+  syncStatus?: SyncStatus;
+  contentUpdatedNotice?: boolean;
   children: React.ReactNode;
 }
 
-const BOTTOM_TABS: { id: ScreenId; label: string; icon: React.FC<{ className?: string }> }[] = [
+const PRIMARY_BOTTOM_TABS: {
+  id: ScreenId;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+}[] = [
   { id: 'home', label: 'الرئيسية', icon: Home },
   { id: 'lessons', label: 'الدروس', icon: BookOpen },
   { id: 'rewards', label: 'المكافآت', icon: Award },
   { id: 'profile', label: 'الملف الشخصي', icon: User },
+];
+
+const COMPANION_BOTTOM_TABS: {
+  id: ScreenId;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+}[] = [
+  { id: 'ask-rafiq', label: 'اسأل رفيق', icon: Bot },
+  { id: 'daily-routine', label: 'جدولي', icon: CalendarCheck2 },
+  { id: 'achievements', label: 'الإنجازات', icon: Trophy },
+  { id: 'parent-dashboard', label: 'المتابعة', icon: Users },
+];
+
+const COMPANION_SCREENS: ScreenId[] = [
+  'ask-rafiq',
+  'daily-routine',
+  'achievements',
+  'parent-dashboard',
 ];
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -30,14 +70,21 @@ export const AppShell: React.FC<AppShellProps> = ({
   onToggleSound,
   pageTitle,
   backTarget,
+  isOnline = true,
+  syncStatus = 'idle',
+  contentUpdatedNotice = false,
   children,
 }) => {
   const showChrome = currentScreen !== 'splash' && currentScreen !== 'login';
-  const showBottomNav =
+  const isPrimaryTabScreen =
     currentScreen === 'home' ||
     currentScreen === 'lessons' ||
     currentScreen === 'rewards' ||
     currentScreen === 'profile';
+  const isCompanionScreen = COMPANION_SCREENS.includes(currentScreen);
+  const showBottomNav = isPrimaryTabScreen || isCompanionScreen;
+
+  const activeBottomTabs = isCompanionScreen ? COMPANION_BOTTOM_TABS : PRIMARY_BOTTOM_TABS;
 
   if (!showChrome) {
     return (
@@ -79,10 +126,10 @@ export const AppShell: React.FC<AppShellProps> = ({
             )}
           </div>
 
-          {/* Desktop horizontal tab links (visible on md+ when on primary screens) */}
+          {/* Desktop horizontal tab links */}
           {showBottomNav && (
-            <nav className="hidden md:flex items-center gap-2" aria-label="التنقل الرئيسي">
-              {BOTTOM_TABS.map((tab) => {
+            <nav className="hidden md:flex items-center gap-1.5" aria-label="التنقل الرئيسي">
+              {activeBottomTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = currentScreen === tab.id;
                 return (
@@ -90,7 +137,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     key={tab.id}
                     type="button"
                     onClick={() => onNavigate(tab.id)}
-                    className={`min-h-[44px] px-4 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-colors duration-200 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4A90E2] ${
+                    className={`min-h-[40px] px-3.5 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-colors duration-200 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4A90E2] ${
                       active
                         ? 'bg-[#4A90E2] text-white'
                         : 'text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9]'
@@ -105,14 +152,17 @@ export const AppShell: React.FC<AppShellProps> = ({
           )}
 
           <div className="flex items-center gap-2 shrink-0">
+            <PWAInstallButton compact />
+
             <button
               type="button"
-              onClick={() => onNavigate('rewards')}
+              onClick={() => onNavigate(isCompanionScreen ? 'achievements' : 'rewards')}
               className="min-h-[44px] px-3.5 rounded-full bg-[#FEF9C3] border border-[#FDE68A] text-[#854D0E] inline-flex items-center gap-1.5 font-bold text-base tabular-nums transition-transform duration-200 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4A90E2]"
               aria-label={`عدد النجوم ${stars}`}
             >
               <Star className="w-5 h-5 fill-[#FFC107] text-[#D97706]" />
               <span>{toArabicDigits(stars)}</span>
+              <span className="hidden sm:inline text-xs font-extrabold">نجمة</span>
             </button>
 
             <button
@@ -141,14 +191,14 @@ export const AppShell: React.FC<AppShellProps> = ({
         {children}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Fixed on small screens, hidden on md+ where top nav handles tabs) */}
+      {/* Mobile Bottom Navigation Bar */}
       {showBottomNav && (
         <nav
           className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-[68px] bg-white/95 backdrop-blur-md border-t border-[#E2E8F0] px-2"
           aria-label="شريط التنقل السفلي"
         >
           <div className="max-w-lg mx-auto h-full grid grid-cols-4 items-center gap-1">
-            {BOTTOM_TABS.map((tab) => {
+            {activeBottomTabs.map((tab) => {
               const Icon = tab.icon;
               const active = currentScreen === tab.id;
               return (
@@ -170,6 +220,11 @@ export const AppShell: React.FC<AppShellProps> = ({
           </div>
         </nav>
       )}
+      <OfflineIndicator
+        isOnline={isOnline}
+        syncStatus={syncStatus}
+        contentUpdatedNotice={contentUpdatedNotice}
+      />
     </div>
   );
 };

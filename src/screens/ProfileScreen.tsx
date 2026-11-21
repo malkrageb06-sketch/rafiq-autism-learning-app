@@ -1,7 +1,21 @@
 import React, { useState } from 'react';
-import { Check, LogOut, RotateCcw, Star, User, Volume2 } from 'lucide-react';
+import {
+  Check,
+  Cloud,
+  LogOut,
+  RefreshCw,
+  RotateCcw,
+  Star,
+  User,
+  Volume2,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import { ProgressState, UserAccount } from '../types/rafiq';
 import { computeOverallProgress, toArabicDigits } from '../data/learningData';
+import { SyncStatus } from '../hooks/useOnlineStatus';
+import { PublishedContentManifest } from '../utils/offlineStorage';
+import { PWAInstallButton } from '../components/PWAStatusComponents';
 
 interface ProfileScreenProps {
   user: UserAccount;
@@ -10,6 +24,11 @@ interface ProfileScreenProps {
   onToggleSound: () => void;
   onResetProgress: () => void;
   onLogout: () => void;
+  isOnline?: boolean;
+  syncStatus?: SyncStatus;
+  lastSyncedAt?: string | null;
+  contentManifest?: PublishedContentManifest | null;
+  onManualSync?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -19,6 +38,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onToggleSound,
   onResetProgress,
   onLogout,
+  isOnline = true,
+  syncStatus = 'idle',
+  lastSyncedAt = null,
+  contentManifest = null,
+  onManualSync,
 }) => {
   const [nameInput, setNameInput] = useState(user.name);
   const [savedNotice, setSavedNotice] = useState(false);
@@ -157,6 +181,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <LogOut className="w-5 h-5" />
             <span>تسجيل الخروج</span>
           </button>
+        </div>
+      </section>
+
+      {/* Online / Offline & Cloud Sync Card */}
+      <section className="rafiq-card p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-xl font-extrabold text-[#1E293B]">وضع الاتصال والمزامنة السحابية</h3>
+          <span
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 border ${
+              isOnline
+                ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#166534]'
+                : 'bg-[#FFFBEB] border-[#FDE68A] text-[#92400E]'
+            }`}
+          >
+            {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+            <span>{isOnline ? 'الوضع المتصل (Online)' : 'الوضع غير المتصل (Offline)'}</span>
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2 text-sm font-medium text-[#475569]">
+          <div className="flex items-center gap-2 text-[#1E293B] font-bold">
+            <Cloud className="w-4 h-4 text-[#4A90E2]" />
+            <span>
+              {syncStatus === 'synced' && lastSyncedAt
+                ? 'تم حفظ ومزامنة التقدم والنجوم سحابياً ومحلياً بنجاح'
+                : syncStatus === 'syncing'
+                ? 'جاري مزامنة التقدم مع السحابة...'
+                : isOnline
+                ? 'التقدم محفوظ محلياً وجاهز للمزامنة السحابية'
+                : 'جميع الدروس والاختبارات والنجوم محفوظة محلياً وتعمل بدون إنترنت'}
+            </span>
+          </div>
+          <div>
+            نسخة المحتوى التعليمي المحفوظة: {contentManifest?.version ?? '1.1.0'} · متاح للعمل دون
+            إنترنت
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {isOnline && onManualSync && (
+            <button
+              type="button"
+              onClick={onManualSync}
+              disabled={syncStatus === 'syncing'}
+              className="min-h-[48px] px-5 py-2.5 rounded-full bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-[#1D4ED8] text-sm font-bold inline-flex items-center gap-2 transition-colors disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <span>مزامنة التقدم وتحديث المحتوى الآن</span>
+            </button>
+          )}
+          <PWAInstallButton />
         </div>
       </section>
     </div>

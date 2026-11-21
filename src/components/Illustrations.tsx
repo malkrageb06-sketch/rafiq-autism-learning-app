@@ -433,3 +433,154 @@ export const EmotionIllustration: React.FC<{
     </svg>
   );
 };
+
+export const RafiqCompanionAvatar: React.FC<{ size?: number }> = ({ size = 96 }) => {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 112 112"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <circle cx="56" cy="56" r="52" fill="#E8F2FC" />
+      <circle cx="56" cy="56" r="42" fill="#FFFFFF" stroke="#BFDBFE" strokeWidth="2.5" />
+      {/* Gentle antenna */}
+      <line x1="56" y1="18" x2="56" y2="29" stroke="#4A90E2" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="56" cy="16" r="5" fill="#FFC107" />
+      {/* Friendly robot head */}
+      <rect x="28" y="30" width="56" height="44" rx="18" fill="#4A90E2" />
+      {/* Screen face */}
+      <rect x="35" y="38" width="42" height="26" rx="10" fill="#EFF6FF" />
+      {/* Soft happy eyes */}
+      <circle cx="46" cy="49" r="4" fill="#1E293B" />
+      <circle cx="66" cy="49" r="4" fill="#1E293B" />
+      <circle cx="47.2" cy="47.5" r="1.3" fill="#FFFFFF" />
+      <circle cx="67.2" cy="47.5" r="1.3" fill="#FFFFFF" />
+      {/* Warm smile */}
+      <path d="M48 56C51 60 61 60 64 56" stroke="#4A90E2" strokeWidth="3" strokeLinecap="round" />
+      {/* Soft side ears */}
+      <rect x="22" y="44" width="6" height="16" rx="3" fill="#93C5FD" />
+      <rect x="84" y="44" width="6" height="16" rx="3" fill="#93C5FD" />
+      {/* Shoulders */}
+      <path d="M36 86C36 78 44 74 56 74C68 74 76 78 76 86" fill="#60A5FA" />
+      <circle cx="56" cy="83" r="4" fill="#4CAF50" />
+    </svg>
+  );
+};
+
+export const RoutineTaskIllustration: React.FC<{
+  iconType: 'wakeup' | 'brush' | 'eat' | 'study' | 'learn' | 'sleep';
+  size?: number;
+}> = ({ iconType, size = 56 }) => {
+  if (iconType === 'wakeup') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#FEF9C3" />
+        <path d="M8 46C18 39 46 39 56 46V56C56 60.4 52.4 64 48 64H16C11.6 64 8 60.4 8 56V46Z" fill="#BAE6FD" />
+        <circle cx="32" cy="28" r="11" fill="#F59E0B" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+          <line
+            key={deg}
+            x1="32"
+            y1="10"
+            x2="32"
+            y2="14"
+            stroke="#F59E0B"
+            strokeWidth="3"
+            strokeLinecap="round"
+            transform={`rotate(${deg} 32 28)`}
+          />
+        ))}
+      </svg>
+    );
+  }
+
+  if (iconType === 'brush') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#E0F2FE" />
+        {/* Toothbrush */}
+        <rect x="14" y="34" width="38" height="8" rx="4" transform="rotate(-15 14 34)" fill="#0EA5E9" />
+        <rect x="34" y="21" width="14" height="9" rx="3" transform="rotate(-15 34 21)" fill="#FFFFFF" />
+        {/* Clean sparkles/bubbles */}
+        <circle cx="22" cy="22" r="5" fill="#FFFFFF" />
+        <circle cx="50" cy="44" r="4" fill="#BAE6FD" />
+        <circle cx="17" cy="47" r="3" fill="#FFFFFF" />
+      </svg>
+    );
+  }
+
+  if (iconType === 'eat') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#DCFCE7" />
+        <circle cx="32" cy="34" r="16" fill="#FFFFFF" stroke="#86EFAC" strokeWidth="3" />
+        <circle cx="32" cy="34" r="10" fill="#FEF3C7" />
+        {/* Healthy apple & toast */}
+        <circle cx="29" cy="34" r="4.5" fill="#E5534B" />
+        <rect x="34" y="29" width="7" height="9" rx="2" fill="#F59E0B" />
+        <rect x="11" y="20" width="3" height="24" rx="1.5" fill="#4CAF50" />
+        <rect x="50" y="20" width="3" height="24" rx="1.5" fill="#4CAF50" />
+      </svg>
+    );
+  }
+
+  if (iconType === 'study') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#EFF6FF" />
+        <rect x="14" y="18" width="18" height="28" rx="4" fill="#FFFFFF" stroke="#4A90E2" strokeWidth="2.5" />
+        <rect x="32" y="18" width="18" height="28" rx="4" fill="#FFFFFF" stroke="#4A90E2" strokeWidth="2.5" />
+        <line x1="19" y1="26" x2="27" y2="26" stroke="#93C5FD" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="19" y1="33" x2="27" y2="33" stroke="#93C5FD" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="37" y1="26" x2="45" y2="26" stroke="#93C5FD" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="37" y1="33" x2="45" y2="33" stroke="#93C5FD" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (iconType === 'learn') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="#F3E8FF" />
+        <rect x="15" y="30" width="16" height="16" rx="4" fill="#8B5CF6" />
+        <rect x="33" y="30" width="16" height="16" rx="4" fill="#F59E0B" />
+        <rect x="24" y="15" width="16" height="16" rx="4" fill="#4CAF50" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <rect width="64" height="64" rx="16" fill="#EEF2FF" />
+      <path
+        d="M36 16C26 17 19 25 19 35C19 45 27 52 37 52C43 52 48 49 51 44C44 45 36 40 35 32C34 25 36 20 36 16Z"
+        fill="#6366F1"
+      />
+      <circle cx="46" cy="22" r="2.5" fill="#FFC107" />
+      <circle cx="22" cy="19" r="2" fill="#A5B4FC" />
+    </svg>
+  );
+};
+
+export const LevelHeroEmblem: React.FC<{ size?: number }> = ({ size = 104 }) => {
+  return (
+    <svg width={size} height={size} viewBox="0 0 112 112" fill="none" aria-hidden="true">
+      <circle cx="56" cy="56" r="50" fill="#FEF9C3" />
+      <circle cx="56" cy="56" r="38" fill="#FDE68A" fillOpacity="0.65" />
+      <path
+        d="M56 20L65.5 40.5L88 43.5L71.5 59L75.5 81.5L56 70.5L36.5 81.5L40.5 59L24 43.5L46.5 40.5L56 20Z"
+        fill="#FFC107"
+        stroke="#D97706"
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+      <circle cx="48" cy="51" r="2.8" fill="#713F12" />
+      <circle cx="64" cy="51" r="2.8" fill="#713F12" />
+      <path d="M50 59C53 62.5 59 62.5 62 59" stroke="#713F12" strokeWidth="2.8" strokeLinecap="round" />
+    </svg>
+  );
+};
+
