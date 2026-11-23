@@ -295,6 +295,11 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
+  // Never intercept connectivity verification probes so online status checks real network reachability
+  if (url.searchParams.has('_connectivity_check')) {
+    return;
+  }
+
   // Never intercept SW script fetches themselves
   if (
     url.origin === self.location.origin &&

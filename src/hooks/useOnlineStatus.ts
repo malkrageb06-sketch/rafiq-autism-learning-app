@@ -31,19 +31,55 @@ export function useOnlineStatus(): boolean {
         return;
       }
 
+      const probeToken = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+      // 1. Check backend /api/health when available (Express or Vercel serverless function)
       try {
-        const res = await fetch('/api/health', {
+        const res = await fetch(`/api/health?_connectivity_check=${probeToken}`, {
           method: 'GET',
           cache: 'no-store',
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(4000),
         });
-        if (!cancelled) {
-          setIsOnline(res.ok);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          if (!cancelled) setIsOnline(true);
+          return;
         }
       } catch {
-        if (!cancelled) {
-          setIsOnline(false);
+        // Fall through to live origin & internet reachability checks
+      }
+
+      // 2. Fallback for static/Vercel deployments without /api/health:
+      //    Probe a small same-origin static asset bypassing SW cache (_connectivity_check)
+      try {
+        const assetRes = await fetch(`/icon.svg?_connectivity_check=${probeToken}`, {
+          method: 'HEAD',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(4000),
+        });
+        if (assetRes.ok) {
+          if (!cancelled) setIsOnline(true);
+          return;
         }
+      } catch {
+        // Fall through to external internet probe
+      }
+
+      // 3. Final fallback: probe external CDN connectivity directly
+      try {
+        await fetch(
+          `https://fonts.googleapis.com/css2?family=Cairo:wght@400&display=swap&_connectivity_check=${probeToken}`,
+          {
+            method: 'HEAD',
+            mode: 'no-cors',
+            cache: 'no-store',
+            signal: AbortSignal.timeout(4000),
+          }
+        );
+        if (!cancelled) setIsOnline(true);
+        return;
+      } catch {
+        if (!cancelled) setIsOnline(false);
       }
     };
 
